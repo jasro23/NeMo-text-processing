@@ -12,5 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nemo_text_processing.text_normalization.normalize import Normalizer
-from nemo_text_processing.text_normalization.normalize_with_audio import NormalizerWithAudio
+# Temporarily commented out for testing without heavy dependencies
+# from nemo_text_processing.text_normalization.normalize import Normalizer
+# from nemo_text_processing.text_normalization.normalize_with_audio import NormalizerWithAudio
