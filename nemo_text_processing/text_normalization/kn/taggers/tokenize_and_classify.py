@@ -28,10 +28,12 @@ from nemo_text_processing.text_normalization.kn.graph_utils import (
 )
 from nemo_text_processing.text_normalization.kn.taggers.cardinal import CardinalFst
 from nemo_text_processing.text_normalization.kn.taggers.decimal import DecimalFst
+from nemo_text_processing.text_normalization.kn.taggers.measure import MeasureFst
 from nemo_text_processing.text_normalization.kn.taggers.money import MoneyFst
 from nemo_text_processing.text_normalization.kn.taggers.ordinal import OrdinalFst
 from nemo_text_processing.text_normalization.kn.taggers.punctuation import PunctuationFst
 from nemo_text_processing.text_normalization.kn.taggers.telephone import TelephoneFst
+from nemo_text_processing.text_normalization.kn.taggers.time import TimeFst
 from nemo_text_processing.text_normalization.kn.taggers.word import WordFst
 
 
@@ -88,21 +90,23 @@ class ClassifyFst(GraphFst):
             telephone = TelephoneFst(cardinal=cardinal, deterministic=deterministic)
             telephone_graph = telephone.fst
 
+            time = TimeFst(cardinal=cardinal, deterministic=deterministic)
+            time_graph = time.fst
+
+            measure = MeasureFst(cardinal=cardinal, decimal=decimal, deterministic=deterministic)
+            measure_graph = measure.fst
+
             punctuation = PunctuationFst(deterministic=deterministic)
             punct_graph = punctuation.fst
 
-            # Add more grammars here as you implement them:
-            # date = DateFst(cardinal=cardinal)
-            # time = TimeFst(cardinal=cardinal)
-
             classify = (
-                pynutil.add_weight(money_graph, 1.0)
+                pynutil.add_weight(time_graph, 0.9)
+                | pynutil.add_weight(measure_graph, 0.95)
+                | pynutil.add_weight(money_graph, 1.0)
                 | pynutil.add_weight(ordinal_graph, 1.02)
                 | pynutil.add_weight(decimal_graph, 1.05)
                 | pynutil.add_weight(telephone_graph, 1.08)
                 | pynutil.add_weight(cardinal_graph, 1.1)
-                # | pynutil.add_weight(date_graph, 1.1)
-                # | pynutil.add_weight(time_graph, 1.1)
             )
 
             word_graph = WordFst(punctuation=punctuation, deterministic=deterministic).fst

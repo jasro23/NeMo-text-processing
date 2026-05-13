@@ -15,9 +15,11 @@
 from nemo_text_processing.text_normalization.kn.graph_utils import GraphFst
 from nemo_text_processing.text_normalization.kn.verbalizers.cardinal import CardinalFst
 from nemo_text_processing.text_normalization.kn.verbalizers.decimal import DecimalFst
+from nemo_text_processing.text_normalization.kn.verbalizers.measure import MeasureFst
 from nemo_text_processing.text_normalization.kn.verbalizers.money import MoneyFst
 from nemo_text_processing.text_normalization.kn.verbalizers.ordinal import OrdinalFst
 from nemo_text_processing.text_normalization.kn.verbalizers.telephone import TelephoneFst
+from nemo_text_processing.text_normalization.kn.verbalizers.time import TimeFst
 
 
 class VerbalizeFst(GraphFst):
@@ -47,9 +49,11 @@ class VerbalizeFst(GraphFst):
         telephone = TelephoneFst(deterministic=deterministic)
         telephone_graph = telephone.fst
 
-        # Add more verbalizers here as you implement them:
-        # date = DateFst()
-        # time = TimeFst(cardinal=cardinal)
+        time = TimeFst()
+        time_graph = time.fst
+
+        measure = MeasureFst(cardinal=cardinal, decimal=decimal)
+        measure_graph = measure.fst
 
         graph = (
             cardinal_graph
@@ -57,8 +61,8 @@ class VerbalizeFst(GraphFst):
             | money_graph
             | ordinal_graph
             | telephone_graph
-            # | date_graph
-            # | time_graph
+            | time_graph
+            | measure_graph
         )
 
         self.fst = graph

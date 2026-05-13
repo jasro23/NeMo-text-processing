@@ -485,6 +485,106 @@ def test_telephone():
     return failed == 0
 
 
+def test_time():
+    """Test time normalization."""
+    print("\n" + "=" * 60)
+    print("Testing Time Normalization")
+    print("=" * 60)
+    
+    classifier = ClassifyFst(deterministic=True)
+    verbalizer = VerbalizeFinalFst(deterministic=True)
+    
+    test_cases = [
+        # Basic time formats
+        ("10:30", "ಹತ್ತು ಗಂಟೆ ಮೂವತ್ತು ನಿಮಿಷ"),
+        ("3:15", "ಮೂರು ಗಂಟೆ ಹದಿನೈದು ನಿಮಿಷ"),
+        ("12:45", "ಹನ್ನೆರಡು ಗಂಟೆ ನಲವತ್ತೈದು ನಿಮಿಷ"),
+        # With seconds
+        ("10:30:45", "ಹತ್ತು ಗಂಟೆ ಮೂವತ್ತು ನಿಮಿಷ ನಲವತ್ತೈದು ಸೆಕೆಂಡು"),
+        # Kannada numerals
+        ("೧೦:೩೦", "ಹತ್ತು ಗಂಟೆ ಮೂವತ್ತು ನಿಮಿಷ"),
+        # Zero minutes - outputs just the hour (like Hindi)
+        ("10:00", "ಹತ್ತು ಗಂಟೆ"),
+        ("1:00", "ಒಂದು ಗಂಟೆ"),
+        # AM/PM support (uses loanwords)
+        ("10:30 AM", "ಹತ್ತು ಗಂಟೆ ಮೂವತ್ತು ನಿಮಿಷ ಎ ಎಂ"),
+        ("10:30 PM", "ಹತ್ತು ಗಂಟೆ ಮೂವತ್ತು ನಿಮಿಷ ಪಿ ಎಂ"),
+        ("10:00 AM", "ಹತ್ತು ಗಂಟೆ ಎ ಎಂ"),
+        ("3 PM", "ಮೂರು ಗಂಟೆ ಪಿ ಎಂ"),
+    ]
+    
+    passed = 0
+    failed = 0
+    
+    for input_text, expected in test_cases:
+        classified = apply_fst(input_text, classifier.fst)
+        result = apply_fst(classified, verbalizer.fst)
+        
+        status = "✓" if result == expected else "✗"
+        if result == expected:
+            passed += 1
+        else:
+            failed += 1
+        print(f"{status} Input: {input_text:15} -> {result}")
+        if result != expected:
+            print(f"  Classified: {classified}")
+            print(f"  Expected: {expected}")
+    
+    print(f"\nResults: {passed} passed, {failed} failed out of {len(test_cases)} tests")
+    return failed == 0
+
+
+def test_measure():
+    """Test measure/unit normalization."""
+    print("\n" + "=" * 60)
+    print("Testing Measure Normalization")
+    print("=" * 60)
+    
+    classifier = ClassifyFst(deterministic=True)
+    verbalizer = VerbalizeFinalFst(deterministic=True)
+    
+    test_cases = [
+        # Weight
+        ("5kg", "ಐದು ಕಿಲೋಗ್ರಾಂ"),
+        ("100g", "ನೂರು ಗ್ರಾಂ"),
+        # Distance
+        ("10km", "ಹತ್ತು ಕಿಲೋಮೀಟರ್"),
+        ("100m", "ನೂರು ಮೀಟರ್"),
+        ("5cm", "ಐದು ಸೆಂಟಿಮೀಟರ್"),
+        # Temperature
+        ("25°C", "ಇಪ್ಪತ್ತೈದು ಡಿಗ್ರಿ ಸೆಲ್ಸಿಯಸ್"),
+        ("-5°C", "ಮೈನಸ್ ಐದು ಡಿಗ್ರಿ ಸೆಲ್ಸಿಯಸ್"),
+        # Percentage
+        ("50%", "ಐವತ್ತು ಶೇಕಡಾ"),
+        # Decimal measure
+        ("3.5kg", "ಮೂರು ದಶಮಾಂಶ ಐದು ಕಿಲೋಗ್ರಾಂ"),
+        # Volume
+        ("2l", "ಎರಡು ಲೀಟರ್"),
+        # Speed
+        ("60km/h", "ಅರವತ್ತು ಕಿಲೋಮೀಟರ್ ಪ್ರತಿ ಗಂಟೆ"),
+    ]
+    
+    passed = 0
+    failed = 0
+    
+    for input_text, expected in test_cases:
+        classified = apply_fst(input_text, classifier.fst)
+        result = apply_fst(classified, verbalizer.fst)
+        
+        status = "✓" if result == expected else "✗"
+        if result == expected:
+            passed += 1
+        else:
+            failed += 1
+        print(f"{status} Input: {input_text:15} -> {result}")
+        if result != expected:
+            print(f"  Classified: {classified}")
+            print(f"  Expected: {expected}")
+    
+    print(f"\nResults: {passed} passed, {failed} failed out of {len(test_cases)} tests")
+    return failed == 0
+
+
 def main():
     print("Kannada Text Normalization - Test Suite")
     print("=" * 60)
@@ -563,6 +663,21 @@ def main():
             all_passed = False
     except Exception as e:
         print(f"Telephone test failed with error: {e}")
+        all_passed = False
+    
+    # Time and Measure tests
+    try:
+        if not test_time():
+            all_passed = False
+    except Exception as e:
+        print(f"Time test failed with error: {e}")
+        all_passed = False
+    
+    try:
+        if not test_measure():
+            all_passed = False
+    except Exception as e:
+        print(f"Measure test failed with error: {e}")
         all_passed = False
     
     print("\n" + "=" * 60)
