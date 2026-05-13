@@ -145,14 +145,12 @@ def generate_mobile(context_keywords: pynini.Fst) -> pynini.Fst:
 
 
 def get_landline(std_length: int, context_keywords: pynini.Fst) -> pynini.Fst:
-    """Generate landline graph for a specific STD code length."""
-    context_before, context_after = get_context(context_keywords)
+    """Generate landline graph for a specific STD code length.
     
-    # Landline STD codes start with 2, 3, 4, or 6
-    landline_start_digit = pynini.union(
-        KN_LANDLINE_START_DIGITS @ digits,
-        KN_LANDLINE_START_DIGITS @ digit_to_word
-    )
+    With context keyword present, any digit is accepted for local number start.
+    The 2/3/4/6 restriction was for disambiguation without context.
+    """
+    context_before, context_after = get_context(context_keywords)
     
     # STD code part - two paths for optional leading 0
     std_code_with_zero = (
@@ -162,12 +160,9 @@ def get_landline(std_length: int, context_keywords: pynini.Fst) -> pynini.Fst:
     std_code_graph = pynini.union(std_code_with_zero, std_code_without_zero)
     
     # Local number part (total digits = 10 - STD length)
-    landline_digit_count = 9 - std_length
-    landline_graph = (
-        landline_start_digit
-        + insert_space
-        + pynini.closure(num_token + insert_space, landline_digit_count, landline_digit_count)
-    )
+    # Accept any digit for local number start when context is present
+    landline_digit_count = 10 - std_length
+    landline_graph = pynini.closure(num_token + insert_space, landline_digit_count, landline_digit_count)
     
     # Optional separator between STD and local number
     separator_optional = pynini.closure(pynini.union(pynini.cross("-", ""), pynini.cross(".", "")), 0, 1)
