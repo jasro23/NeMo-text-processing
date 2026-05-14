@@ -60,13 +60,21 @@ class TimeFst(GraphFst):
             + insert_space
         )
 
-        # AM/PM suffix (ಬೆಳಿಗ್ಗೆ = morning, ಸಂಜೆ = evening)
+        # AM/PM suffix (ಎ ಎಂ / ಪಿ ಎಂ)
         suffix = (
             pynutil.delete("suffix: \"")
             + pynini.closure(NEMO_NOT_QUOTE, 1)
             + pynutil.delete("\"")
         )
         optional_suffix = pynini.closure(delete_space + insert_space + suffix, 0, 1)
+
+        # Kannada locative suffix (ಕ್ಕೆ/ಗೆ = "at") - append at end
+        locative = (
+            pynutil.delete("locative: \"")
+            + pynini.closure(NEMO_NOT_QUOTE, 1)
+            + pynutil.delete("\"")
+        )
+        optional_locative = pynini.closure(delete_space + locative, 0, 1)
 
         # Kannada time markers
         insert_gante = pynutil.insert("ಗಂಟೆ")  # hour marker
@@ -86,9 +94,10 @@ class TimeFst(GraphFst):
             + second
             + delete_space
             + insert_sekendu
+            + optional_locative
         )
 
-        # hour:minute with optional AM/PM
+        # hour:minute with optional AM/PM, then optional locative
         graph_hm = (
             hour
             + delete_space
@@ -98,10 +107,11 @@ class TimeFst(GraphFst):
             + delete_space
             + insert_nimisha
             + optional_suffix
+            + optional_locative
         )
 
-        # hour only with optional AM/PM
-        graph_h = hour + delete_space + insert_gante + optional_suffix
+        # hour only with optional AM/PM, then optional locative
+        graph_h = hour + delete_space + insert_gante + optional_suffix + optional_locative
 
         self.graph = graph_hms | graph_hm | graph_h
 

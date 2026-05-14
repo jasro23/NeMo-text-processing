@@ -25,6 +25,9 @@ KN_DOUBLE_ZERO = pynini.union("೦೦", "00")
 AM_PATTERN = pynini.union("AM", "am", "Am", "aM", "ಎ ಎಂ", "ಎಎಂ")
 PM_PATTERN = pynini.union("PM", "pm", "Pm", "pM", "ಪಿ ಎಂ", "ಪಿಎಂ")
 
+# Kannada locative suffix (ಕ್ಕೆ = "at") - commonly attached to time
+KN_SUFFIX = pynini.union("ಕ್ಕೆ", "ಗೆ")
+
 hours_graph = pynini.string_file(get_abs_path("data/time/hours.tsv"))
 minutes_graph = pynini.string_file(get_abs_path("data/time/minutes.tsv"))
 
@@ -60,19 +63,27 @@ class TimeFst(GraphFst):
         pm_suffix = optional_space + pynini.cross(PM_PATTERN, "") + pynutil.insert(" suffix: \"ಪಿ ಎಂ\"")
         optional_suffix = pynini.closure(am_suffix | pm_suffix, 0, 1)
 
+        # Kannada locative suffix (ಕ್ಕೆ/ಗೆ = "at") - preserve in output
+        # Store in a "locative" field so verbalizer can append it
+        preserve_kn_suffix = (
+            pynini.cross("ಕ್ಕೆ", "") + pynutil.insert(" locative: \"ಕ್ಕೆ\"")
+            | pynini.cross("ಗೆ", "") + pynutil.insert(" locative: \"ಗೆ\"")
+        )
+        optional_kn_suffix = pynini.closure(preserve_kn_suffix, 0, 1)
+
         # hour:minute:second (no AM/PM with seconds)
         graph_hms = (
-            self.hours + delete_colon + self.minutes + delete_colon + self.seconds
+            self.hours + delete_colon + self.minutes + delete_colon + self.seconds + optional_kn_suffix
         )
 
-        # hour:minute with optional AM/PM
-        graph_hm = self.hours + delete_colon + self.minutes + optional_suffix
+        # hour:minute with optional AM/PM, then optional Kannada suffix
+        graph_hm = self.hours + delete_colon + self.minutes + optional_suffix + optional_kn_suffix
 
         # hour:00 (just the hour) with optional AM/PM - HIGHEST PRIORITY
-        graph_h = self.hours + delete_colon + pynutil.delete(KN_DOUBLE_ZERO) + optional_suffix
+        graph_h = self.hours + delete_colon + pynutil.delete(KN_DOUBLE_ZERO) + optional_suffix + optional_kn_suffix
 
         # hour AM/PM (no colon, e.g., "10 AM")
-        graph_h_ampm = self.hours + (am_suffix | pm_suffix)
+        graph_h_ampm = self.hours + (am_suffix | pm_suffix) + optional_kn_suffix
 
         final_graph = (
             pynutil.add_weight(graph_h, 0.05)  # X:00 gets highest priority

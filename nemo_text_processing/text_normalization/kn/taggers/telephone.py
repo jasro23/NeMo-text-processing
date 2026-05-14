@@ -80,8 +80,10 @@ def generate_mobile(context_keywords: pynini.Fst) -> pynini.Fst:
         KN_MOBILE_START_DIGITS @ digit_to_word
     )
     
-    # Country code: + followed by 1-3 digits
+    # Country code: + followed by 1-3 digits, with optional hyphen after
     country_code_digits = pynini.closure(num_token + insert_space, 1, 3)
+    # Optional hyphen/space after country code (e.g., +91-9876... or +91 9876...)
+    optional_separator = pynini.closure(pynini.union(pynutil.delete("-"), delete_space), 0, 1)
     country_code = (
         pynutil.insert("country_code: \"")
         + context_before
@@ -89,7 +91,7 @@ def generate_mobile(context_keywords: pynini.Fst) -> pynini.Fst:
         + insert_space
         + country_code_digits
         + pynutil.insert("\" ")
-        + pynini.closure(delete_space, 0, 1)
+        + optional_separator
     )
     
     # Optional extension (1-3 digits after main number)
@@ -244,20 +246,81 @@ def generate_pincode(context_keywords: pynini.Fst) -> pynini.Fst:
     ).optimize()
 
 
+def generate_tollfree() -> pynini.Fst:
+    """Generate toll-free number graph (1800-xxx-xxx or 18001234567).
+    
+    Indian toll-free numbers start with 1800, followed by 6-7 more digits.
+    Total: 10-11 digits (1800 + 6-7)
+    
+    Examples:
+        1800-123-456 -> ಒಂದು ಎಂಟು ಸೊನ್ನೆ ಸೊನ್ನೆ ಒಂದು ಎರಡು ಮೂರು ನಾಲ್ಕು ಐದು ಆರು
+        18001234567 -> ಒಂದು ಎಂಟು ಸೊನ್ನೆ ಸೊನ್ನೆ ...
+    """
+    # 1800 prefix - using digit mapping like other phone functions
+    digit_1 = pynini.cross("1", "") @ pynini.union(digit_to_word, digits)
+    digit_8 = pynini.cross("8", "") @ pynini.union(digit_to_word, digits)
+    digit_0 = pynini.cross("0", "") @ pynini.union(digit_to_word, digits, zero)
+    
+    prefix_1800 = (
+        pynini.cross("1", "ಒಂದು") + insert_space
+        + pynini.cross("8", "ಎಂಟು") + insert_space
+        + pynini.cross("0", "ಸೊನ್ನೆ") + insert_space
+        + pynini.cross("0", "ಸೊನ್ನೆ") + insert_space
+    )
+    
+    # Optional separator (hyphen or space)
+    separator_optional = pynini.closure(
+        pynini.union(pynutil.delete("-"), pynutil.delete(" ")),
+        0, 1
+    )
+    
+    # Remaining digits with separators
+    # Format: 1800-xxx-xxx (groups of 3) or 1800-xxx-xxxx (3+4)
+    group_of_3 = pynini.closure(num_token + insert_space, 3, 3)
+    group_of_4 = pynini.closure(num_token + insert_space, 4, 4)
+    
+    # 1800-123-456 (10 total: 1800 + 3 + 3)
+    remaining_3_3 = group_of_3 + separator_optional + group_of_3
+    # 1800-123-4567 (11 total: 1800 + 3 + 4)
+    remaining_3_4 = group_of_3 + separator_optional + group_of_4
+    # 1800-1234-567 (11 total: 1800 + 4 + 3)
+    remaining_4_3 = group_of_4 + separator_optional + group_of_3
+    
+    remaining_with_separators = pynini.union(remaining_3_3, remaining_3_4, remaining_4_3)
+    
+    # Continuous format: 1800xxxxxx (6 digits) or 1800xxxxxxx (7 digits)
+    remaining_continuous = pynini.closure(num_token + insert_space, 6, 7)
+    
+    remaining_part = pynini.union(remaining_with_separators, remaining_continuous)
+    
+    return (
+        pynutil.insert("number_part: \"")
+        + prefix_1800
+        + separator_optional
+        + remaining_part
+        + pynutil.insert("\" ")
+        + delete_space
+    ).optimize()
+
+
 class TelephoneFst(GraphFst):
     """
-    Finite state transducer for classifying telephone numbers, credit cards, and pincodes.
+    Finite state transducer for classifying telephone numbers, credit cards, pincodes, and toll-free numbers.
     Uses context keywords to disambiguate from cardinal numbers.
     
     Examples:
-        ಮೊಬೈಲ್ 9876543210 -> telephone { number_part: "ಸೊನ್ನೆ ಒಂಬತ್ತು ಎಂಟು ಏಳು ಆರು ಐದು ನಾಲ್ಕು ಮೂರು ಎರಡು ಒಂದು ಸೊನ್ನೆ " }
+        ಮೊಬೈಲ್ 9876543210 -> telephone { number_part: "ಒಂಬತ್ತು ಎಂಟು ಏಳು ..." }
         +91 9876543210 -> telephone { country_code: "ಪ್ಲಸ್ ಒಂಬತ್ತು ಒಂದು " number_part: "..." }
+        +91-9876543210 -> telephone { country_code: "ಪ್ಲಸ್ ಒಂಬತ್ತು ಒಂದು " number_part: "..." }
         ಪಿನ್‌ಕೋಡ್ 560001 -> telephone { number_part: "ಐದು ಆರು ಸೊನ್ನೆ ಸೊನ್ನೆ ಸೊನ್ನೆ ಒಂದು " }
+        1800-123-456 -> telephone { number_part: "ಒಂದು ಎಂಟು ಸೊನ್ನೆ ಸೊನ್ನೆ ..." }
         
     Context keywords trigger telephone classification:
-        - Mobile: ನಂಬರ್, ಮೊಬೈಲ್, ಫೋನ್, ದೂರವಾಣಿ, ಕಾಲ್
+        - Mobile: ನಂಬರ್, ಮೊಬೈಲ್, ಫೋನ್, ದೂರವಾಣಿ, ಕಾಲ್, ಕರೆ
         - Credit: ಕಾರ್ಡ್, ಕ್ರೆಡಿಟ್
         - Pincode: ಪಿನ್, ಕೋಡ್, ಪಿನ್‌ಕೋಡ್
+        
+    Toll-free numbers (1800-xxx-xxx) are recognized without context keywords.
 
     Args:
         cardinal: CardinalFst (not used, kept for API consistency)
@@ -271,9 +334,11 @@ class TelephoneFst(GraphFst):
         landline = generate_landline(landline_context)
         credit_card = generate_credit(credit_context)
         pincode = generate_pincode(pincode_context)
+        tollfree = generate_tollfree()
 
         graph = (
-            pynutil.add_weight(mobile_number, 0.7)
+            pynutil.add_weight(tollfree, 0.6)  # Highest priority for 1800 numbers
+            | pynutil.add_weight(mobile_number, 0.7)
             | pynutil.add_weight(landline, 0.8)
             | pynutil.add_weight(credit_card, 0.9)
             | pynutil.add_weight(pincode, 1.0)
